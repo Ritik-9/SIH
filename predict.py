@@ -1,9 +1,19 @@
+import requests
 import pandas as pd
+import numpy as np
 import joblib
 
 
 # ============================================================
-# 1. LOAD MODELS
+# 1. CONFIGURATION
+# ============================================================
+
+LATITUDE = 28.50
+LONGITUDE = 77.25
+
+
+# ============================================================
+# 2. LOAD TRAINED MODELS
 # ============================================================
 
 heatwave_model = joblib.load(
@@ -16,14 +26,137 @@ risk_model = joblib.load(
 
 
 # ============================================================
-# 2. LOAD DATA
+# 3. WEATHER API
 # ============================================================
 
-df = pd.read_csv("ml_dataset.csv")
+url = "https://api.open-meteo.com/v1/forecast"
+
+params = {
+    "latitude": LATITUDE,
+    "longitude": LONGITUDE,
+
+    "hourly": ",".join([
+        "temperature_2m",
+        "relative_humidity_2m",
+        "dew_point_2m",
+        "wind_speed_10m",
+        "shortwave_radiation",
+        "surface_pressure"
+    ]),
+
+    "forecast_days": 7,
+
+    "temperature_unit": "celsius",
+    "wind_speed_unit": "ms",
+
+    "timezone": "Asia/Kolkata"
+}
+
+
+print("\nFetching weather data...")
+
+response = requests.get(
+    url,
+    params=params,
+    timeout=30
+)
+
+response.raise_for_status()
+
+weather = response.json()
+
+print("Weather data received successfully.")
 
 
 # ============================================================
-# 3. FEATURES
+# 4. CREATE DATAFRAME
+# ============================================================
+
+hourly = weather["hourly"]
+
+df = pd.DataFrame(hourly)
+
+df["time"] = pd.to_datetime(df["time"])
+
+df = df.rename(columns={
+    "time": "valid_time",
+    "temperature_2m": "temperature",
+    "relative_humidity_2m": "humidity",
+    "dew_point_2m": "dewpoint",
+    "wind_speed_10m": "wind_speed",
+    "shortwave_radiation": "solar_radiation",
+    "surface_pressure": "pressure"
+})
+
+
+# ============================================================
+# 5. DAILY FEATURES
+# ============================================================
+
+df["date"] = df["valid_time"].dt.date
+
+daily = df.groupby("date").agg(
+
+    max_temperature=(
+        "temperature",
+        "max"
+    ),
+
+    mean_temperature=(
+        "temperature",
+        "mean"
+    ),
+
+    max_humidity=(
+        "humidity",
+        "max"
+    ),
+
+    mean_humidity=(
+        "humidity",
+        "mean"
+    ),
+
+    max_dewpoint=(
+        "dewpoint",
+        "max"
+    ),
+
+    mean_dewpoint=(
+        "dewpoint",
+        "mean"
+    ),
+
+    max_wind_speed=(
+        "wind_speed",
+        "max"
+    ),
+
+    mean_wind_speed=(
+        "wind_speed",
+        "mean"
+    ),
+
+    max_solar_radiation=(
+        "solar_radiation",
+        "max"
+    ),
+
+    mean_solar_radiation=(
+        "solar_radiation",
+        "mean"
+    ),
+
+    mean_pressure=(
+        "pressure",
+        "mean"
+    )
+
+).reset_index()
+
+
+# ============================================================
+# 6. FEATURES USED BY ML MODELS
 # ============================================================
 
 features = [
@@ -42,51 +175,54 @@ features = [
 
 
 # ============================================================
-# 4. SELECT A DAY AUTOMATICALLY
+# 7. PREDICT EACH DAY
 # ============================================================
 
-# For testing, select one row automatically.
-# Later this will come from the weather API.
+X = daily[features]
 
-sample = df.iloc[[0]]
+heatwave_predictions = heatwave_model.predict(X)
 
-X = sample[features]
-
-
-# ============================================================
-# 5. HEATWAVE PREDICTION
-# ============================================================
-
-heatwave_prediction = heatwave_model.predict(X)[0]
+risk_predictions = risk_model.predict(X)
 
 
-if heatwave_prediction == 1:
-    heatwave_result = "Heatwave"
-else:
-    heatwave_result = "No Heatwave"
+daily["heatwave_prediction"] = np.where(
+    heatwave_predictions == 1,
+    "Heatwave",
+    "No Heatwave"
+)
+
+daily["risk_level"] = risk_predictions
 
 
 # ============================================================
-# 6. RISK LEVEL PREDICTION
-# ============================================================
-
-risk_prediction = risk_model.predict(X)[0]
-
-
-# ============================================================
-# 7. DISPLAY RESULT
+# 8. DISPLAY PREDICTIONS
 # ============================================================
 
 print("\n============================================================")
-print("                 HEATWAVE PREDICTION")
+print("             AUTOMATED HEATWAVE PREDICTION")
 print("============================================================")
 
-print("\nINPUT WEATHER FEATURES:")
-print(X.to_string(index=False))
+print("\nLocation:")
+print(f"Latitude : {LATITUDE}")
+print(f"Longitude: {LONGITUDE}")
 
-print("\n------------------------------------------------------------")
+print("\nFORECAST PREDICTIONS:")
+print("------------------------------------------------------------")
 
-print(f"Heatwave Prediction : {heatwave_result}")
-print(f"Risk Level          : {risk_prediction}")
+print(
+    daily[
+        [
+            "date",
+            "max_temperature",
+            "mean_temperature",
+            "max_humidity",
+            "mean_humidity",
+            "heatwave_prediction",
+            "risk_level"
+        ]
+    ].to_string(index=False)
+)
 
+print("\n============================================================")
+print("Prediction completed successfully!")
 print("============================================================")
