@@ -1,6 +1,6 @@
 import pandas as pd
+import joblib
 
-from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import (
     accuracy_score,
@@ -14,6 +14,8 @@ from sklearn.metrics import (
 # ============================================================
 
 df = pd.read_csv("ml_dataset.csv")
+
+df["date"] = pd.to_datetime(df["date"])
 
 
 # ============================================================
@@ -39,25 +41,39 @@ y = df["heatwave_day"]
 
 
 # ============================================================
-# 3. TRAIN / TEST SPLIT
+# 3. CHRONOLOGICAL TRAIN / TEST SPLIT
 # ============================================================
 
-X_train, X_test, y_train, y_test = train_test_split(
-    X,
-    y,
-    test_size=0.20,
-    random_state=42,
-    stratify=y
-)
+train_df = df[df["date"].dt.year <= 2023].copy()
+test_df = df[df["date"].dt.year == 2024].copy()
 
+
+X_train = train_df[features]
+y_train = train_df["heatwave_day"]
+
+X_test = test_df[features]
+y_test = test_df["heatwave_day"]
+
+
+print("\n============================================================")
+print("       CHRONOLOGICAL MODEL VALIDATION")
+print("============================================================")
+
+print("\nTRAINING PERIOD:")
+print("2020 - 2023")
+
+print("\nTESTING PERIOD:")
+print("2024")
 
 print("\nDATA SPLIT:")
 print("-----------------------------")
 print(f"Training samples: {len(X_train)}")
 print(f"Testing samples : {len(X_test)}")
 
+
 print("\nTraining target distribution:")
 print(y_train.value_counts())
+
 
 print("\nTesting target distribution:")
 print(y_test.value_counts())
@@ -88,10 +104,14 @@ y_pred = model.predict(X_test)
 # 6. MODEL ACCURACY
 # ============================================================
 
-accuracy = accuracy_score(y_test, y_pred)
+accuracy = accuracy_score(
+    y_test,
+    y_pred
+)
 
 print("\nMODEL ACCURACY:")
-print(accuracy)
+print("-----------------------------")
+print(f"{accuracy:.4f}")
 
 
 # ============================================================
@@ -99,6 +119,7 @@ print(accuracy)
 # ============================================================
 
 print("\nCLASSIFICATION REPORT:")
+print("-----------------------------")
 
 print(
     classification_report(
@@ -119,6 +140,7 @@ print(
 # ============================================================
 
 print("\nCONFUSION MATRIX:")
+print("-----------------------------")
 
 cm = confusion_matrix(
     y_test,
@@ -144,18 +166,21 @@ importance = importance.sort_values(
 )
 
 print("\nFEATURE IMPORTANCE:")
-print(importance)
+print("-----------------------------")
+
+print(importance.to_string(index=False))
 
 
 # ============================================================
-# 10. SAVE MODEL
+# 10. SAVE VALIDATED MODEL
 # ============================================================
-
-import joblib
 
 joblib.dump(
     model,
-    "heatwave_model.pkl"
+    "models/heatwave_model.pkl"
 )
 
-print("\nModel saved successfully!")
+print("\n============================================================")
+print("Validated model saved successfully!")
+print("Location: models/heatwave_model.pkl")
+print("============================================================")

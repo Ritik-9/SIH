@@ -1,7 +1,6 @@
 import pandas as pd
-import numpy as np
+import joblib
 
-from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import (
     accuracy_score,
@@ -9,14 +8,14 @@ from sklearn.metrics import (
     confusion_matrix
 )
 
-import joblib
-
 
 # ============================================================
 # 1. LOAD DAILY DATA
 # ============================================================
 
 df = pd.read_csv("daily_heatwave_data.csv")
+
+df["date"] = pd.to_datetime(df["date"])
 
 
 # ============================================================
@@ -67,17 +66,32 @@ print(y.isnull().sum())
 
 
 # ============================================================
-# 4. TRAIN / TEST SPLIT
+# 4. CHRONOLOGICAL TRAIN / TEST SPLIT
 # ============================================================
 
-X_train, X_test, y_train, y_test = train_test_split(
-    X,
-    y,
-    test_size=0.20,
-    random_state=42,
-    stratify=y
-)
+# 2020-2023 -> Training
+# 2024       -> Testing
 
+train_df = df[df["date"].dt.year <= 2023].copy()
+test_df = df[df["date"].dt.year == 2024].copy()
+
+
+X_train = train_df[features]
+y_train = train_df["daily_risk_level"]
+
+X_test = test_df[features]
+y_test = test_df["daily_risk_level"]
+
+
+print("\n============================================================")
+print("       CHRONOLOGICAL RISK MODEL VALIDATION")
+print("============================================================")
+
+print("\nTRAINING PERIOD:")
+print("2020 - 2023")
+
+print("\nTESTING PERIOD:")
+print("2024")
 
 print("\nDATA SPLIT:")
 print("-----------------------------")
@@ -116,18 +130,22 @@ y_pred = model.predict(X_test)
 # 7. MODEL ACCURACY
 # ============================================================
 
-accuracy = accuracy_score(y_test, y_pred)
+accuracy = accuracy_score(
+    y_test,
+    y_pred
+)
 
 print("\nMODEL ACCURACY:")
-print(accuracy)
+print("-----------------------------")
+print(f"{accuracy:.4f}")
 
 
 # ============================================================
 # 8. CLASSIFICATION REPORT
 # ============================================================
 
+# Only use classes that actually exist in the complete dataset.
 risk_labels = [
-    "Low",
     "Elevated",
     "Moderate",
     "High",
@@ -136,6 +154,7 @@ risk_labels = [
 ]
 
 print("\nCLASSIFICATION REPORT:")
+print("-----------------------------")
 
 print(
     classification_report(
@@ -153,6 +172,7 @@ print(
 # ============================================================
 
 print("\nCONFUSION MATRIX:")
+print("-----------------------------")
 
 cm = confusion_matrix(
     y_test,
@@ -160,11 +180,13 @@ cm = confusion_matrix(
     labels=risk_labels
 )
 
-print(pd.DataFrame(
-    cm,
-    index=risk_labels,
-    columns=risk_labels
-))
+print(
+    pd.DataFrame(
+        cm,
+        index=risk_labels,
+        columns=risk_labels
+    )
+)
 
 
 # ============================================================
@@ -182,7 +204,11 @@ importance = importance.sort_values(
 )
 
 print("\nFEATURE IMPORTANCE:")
-print(importance)
+print("-----------------------------")
+
+print(
+    importance.to_string(index=False)
+)
 
 
 # ============================================================
@@ -194,5 +220,7 @@ joblib.dump(
     "models/risk_model.pkl"
 )
 
-print("\nRisk model saved successfully!")
+print("\n============================================================")
+print("Validated risk model saved successfully!")
 print("Location: models/risk_model.pkl")
+print("============================================================")

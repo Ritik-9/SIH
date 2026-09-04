@@ -64,7 +64,15 @@ print(y.isnull().sum())
 # 5. CREATE ML DATASET
 # ============================================================
 
-ml_data = X.copy()
+# Keep date for chronological train/test validation.
+# Date is metadata and is NOT used as an ML feature.
+
+ml_data = pd.DataFrame()
+
+ml_data["date"] = df["date"]
+
+for feature in features:
+    ml_data[feature] = df[feature]
 
 ml_data["heatwave_day"] = y
 
@@ -85,3 +93,6 @@ print(ml_data.shape)
 
 print("\nML DATASET PREVIEW:")
 print(ml_data.head())
+
+print("\nML DATASET COLUMNS:")
+print(ml_data.columns.tolist())
