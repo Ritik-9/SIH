@@ -1,11 +1,11 @@
 import xarray as xr
 
 accum = xr.open_dataset(
-    "data/era5/data_stream-oper_stepType-accum.nc"
+    "data/era5/2024/data_stream-oper_stepType-accum.nc"
 )
 
 instant = xr.open_dataset(
-    "data/era5/data_stream-oper_stepType-instant.nc"
+    "data/era5/2024/data_stream-oper_stepType-instant.nc"
 )
 
 print("\n========== INSTANT DATA ==========")
